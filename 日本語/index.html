@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>単語帳アプリ</title>
+
+<style>
+/* =========================================
+   共通・タブ用スタイル
+   ========================================= */
+body { 
+  font-family: "Helvetica Neue", Arial, "Segoe UI", sans-serif; 
+  margin: 0; 
+  background: #f0f2f5;
+  -webkit-tap-highlight-color: transparent; /* スマホタップ時の青枠を消す */
+}
+
+.top-bar-tabs {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  background: white;
+  z-index: 2000;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  box-sizing: border-box;
+}
+
+.nav-tabs { 
+  display: flex; 
+  gap: 10px; 
+  padding: 10px 15px;
+  border-bottom: 2px solid #eee; 
+}
+.nav-tabs button {
+  flex: 1;
+  background: #e0e0e0;
+  color: #333;
+  font-size: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+  touch-action: manipulation; /* スマホのダブルタップズームを防止 */
+}
+.nav-tabs button.active { background: #4CAF50; color: white; }
+
+.view-content { display: none; }
+.view-content.active { display: block; }
+
+/* 読み（ルビ）用のスタイル */
+ruby { ruby-align: center; }
+rt { font-size: 0.6em; color: #777; font-weight: normal; }
+.hide-target rt { color: inherit; }
+
+/* =========================================
+   1. クイズ (テスト) 用スタイル
+   ========================================= */
+.quiz-container {
+  max-width: 500px;
+  margin: 20px auto;
+  background: white;
+  padding: 20px;
+  border-radius: 15px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  text-align: center;
+  color: #333;
+  box-sizing: border-box;
+  width: 95%; /* スマホ画面に収める */
+}
+
+.setting-row {
+  margin-bottom: 10px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 10px;
+  font-size: 14px;
+  text-align: left;
+}
+
+.quiz-container input[type="number"] { width: 60px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+.quiz-container select { padding: 5px; border-radius: 4px; border: 1px solid #ccc; font-size: 16px; }
+
+.quiz-btn {
+  padding: 12px 20px;
+  margin: 5px;
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  transition: 0.2s;
+  touch-action: manipulation;
+}
+
+.start-word { background: #1a73e8; color: white; }
+.start-meaning { background: #9c27b0; color: white; }
+.choice {
+  display: block;
+  width: 100%;
+  margin: 10px 0;
+  background: #edf2f7;
+  color: #2d3748;
+  text-align: center;
+  padding: 15px 20px; /* スマホで押しやすいように上下余白を拡大 */
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  box-sizing: border-box;
+  word-break: break-all;
+  min-height: 55px; /* 最低高さを確保 */
+  touch-action: manipulation;
+}
+.choice:hover { background: #e2e8f0; }
+
+.correct { background: #48bb78 !important; color: white; }
+.wrong { background: #f56565 !important; color: white; }
+
+.giveup-btn {
+  background: none;
+  color: #718096;
+  font-size: 14px;
+  text-decoration: underline;
+  margin-top: 15px;
+  border: none;
+  cursor: pointer;
+  padding: 10px;
+  touch-action: manipulation;
+}
+
+.question {
+  font-size: 28px; /* スマホ用に少し調整 */
+  margin: 20px 0;
+  font-weight: bold;
+  word-wrap: break-word;
+  word-break: break-all;
+}
+.q-no { font-size: 14px; color: #a0aec0; }
+
+#scoreBox {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 160px;
+  background: white;
+  border-top: 2px solid #e2e8f0;
+  padding: 10px 15px;
+  z-index: 1000;
+  box-shadow: 0 -3px 10px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.score-content { overflow-y: auto; flex-grow: 1; -webkit-overflow-scrolling: touch; }
+.score-label { font-weight: bold; font-size: 13px; margin-top: 5px; display: flex; align-items: center; color: #333; }
+
+.mark-span {
+  cursor: pointer;
+  margin: 3px;
+  padding: 5px 10px; /* タップしやすく調整 */
+  border-radius: 6px;
+  display: inline-block;
+  font-size: 13px;
+  font-weight: bold;
+  white-space: nowrap;
+  transition: transform 0.1s;
+  touch-action: manipulation;
+}
+.mark-span:active { transform: scale(0.95); }
+
+.correctMark { color: #22543d; background: #c6f6d5; }
+.wrongMark { color: #822727; background: #fed7d7; }
+
+/* =========================================
+   3. 赤シート用スタイル
+   ========================================= */
+.red-mode-header {
+  position: fixed;
+  top: 60px;
+  width: 100%;
+  background: #fff;
+  padding: 10px 15px; /* 左右余白を追加 */
+  z-index: 1500;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.red-row-header { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+
+.red-list-container {
+  position: relative;
+  margin-top: 135px; /* ヘッダーの高さに合わせて調整 */
+  background: white;
+  min-height: 100vh;
+}
+
+.red-row {
+  display: flex;
+  border-bottom: 1px solid #eee;
+  min-height: 65px; /* タップしやすく調整 */
+  align-items: center;
+  box-sizing: border-box;
+  padding: 10px 0;
+}
+
+.red-star-col {
+  width: 50px; /* タップ領域を拡大 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  cursor: pointer;
+  color: #ddd;
+  flex-shrink: 0;
+  border-right: 1px solid #eee;
+  align-self: stretch;
+  touch-action: manipulation;
+}
+.red-star-col.fav { color: #ffc107; }
+
+.red-word-col {
+  flex: 1;
+  padding: 0 10px;
+  font-size: 16px; /* スマホでバランスを取るため少し調整 */
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  border-right: 1px solid #eee;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+.red-meaning-col {
+  flex: 1;
+  padding: 0 10px;
+  font-size: 14px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+.hide-target { color: #f44336 !important; }
+
+#moving-sheet {
+  position: absolute;
+  width: 48%; /* 中央の線にかぶらないよう微調整 */
+  background: rgba(244, 67, 54, 0.95);
+  z-index: 100;
+  cursor: pointer;
+  transition: top 0.2s ease;
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+  touch-action: manipulation;
+}
+
+#moving-sheet::after {
+  content: "ENTER / タップ";
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  opacity: 0.8;
+}
+
+.study-btn {
+  padding: 10px 18px;
+  font-size: 14px;
+  border: none;
+  border-radius: 8px;
+  background: #4CAF50;
+  color: white;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
+  touch-action: manipulation;
+}
+</style>
+</head>
+
+<body>
+
+<div class="top-bar-tabs">
+  <div class="nav-tabs">
+    <button id="tab-redsheet" onclick="switchTab('redsheet')">🔴 赤シート</button>
+    <button id="tab-test" onclick="switchTab('test')">📝 テスト</button>
+  </div>
+</div>
+
+<div id="view-redsheet" class="view-content">
+  <div class="red-mode-header">
+    <div class="red-row-header">
+      <div style="font-weight:bold; font-size:13px; color:#555;">
+        範囲: <select id="redModeSelect" onchange="initRedSheet()"><option value="all">全部</option><option value="fav">⭐</option></select>
+        開始: <input type="number" id="redStartNum" value="1" style="width:40px; font-size:16px;" onchange="initRedSheet()">
+      </div>
+      <div id="red-counter" style="font-weight:bold; color:#f44336; font-size:14px;">0 / 0</div>
+      <button class="study-btn" style="background:#2196F3; font-size:12px; padding:8px 12px;" onclick="resetRedSheet()">リセット</button>
+    </div>
+    <div style="font-weight:bold; font-size:13px; color:#555; display: flex; gap: 10px; align-items: center; margin-top: 5px; flex-wrap: wrap;">
+      <span>並び順: 
+        <select id="redSortSelect" onchange="initRedSheet()" style="font-size:14px;">
+          <option value="sequential">順番通り</option>
+          <option value="random">ランダム</option>
+        </select>
+      </span>
+      <span>隠す: 
+        <label><input type="radio" name="hideSide" value="word" checked onchange="initRedSheet()"> 単語</label>
+        <label><input type="radio" name="hideSide" value="meaning" onchange="initRedSheet()"> 意味</label>
+      </span>
+    </div>
+  </div>
+
+  <div id="red-list-container" class="red-list-container">
+    <div id="moving-sheet" onclick="nextRedStep()"></div>
+    <div id="red-list-body"></div>
+  </div>
+</div>
+
+<div id="view-test" class="view-content">
+  <div class="quiz-container">
+    <h2>単語クイズ</h2>
+    <div class="setting-row">
+      範囲:
+      <select id="modeSelect">
+        <option value="all">全部</option>
+        <option value="fav">⭐お気に入り</option>
+        <option value="range">範囲指定</option>
+      </select>
+      <div id="rangeBox" style="display:none; margin-top:10px;">
+        <input type="number" id="start" placeholder="1" oninput="updateAvailableCount()"> ～ <input type="number" id="end" oninput="updateAvailableCount()">
+      </div>
+    </div>
+    <div class="setting-row">
+      スタート場所(番号): <input type="number" id="testStartLoc" value="1" style="width:60px;" oninput="updateAvailableCount()">
+    </div>
+    <div class="setting-row">
+      出題順: 
+      <label><input type="radio" name="testOrder" value="random" checked> ランダム</label>
+      <label style="margin-left: 10px;"><input type="radio" name="testOrder" value="sequential"> 順番通り</label>
+    </div>
+    <div class="setting-row">
+      対象問題数: <span id="availableCount" style="font-weight:bold; color:#1a73e8;">0</span> 問
+    </div>
+    <div class="setting-row">
+      出題数: <input type="number" id="count" value="10"> 問
+    </div>
+    <button class="quiz-btn start-word" onclick="startQuiz('word')">単語→意味</button>
+    <button class="quiz-btn start-meaning" onclick="startQuiz('meaning')">意味→単語</button>
+    <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
+    <div id="quizBox"><p style="color:#999;">「開始」を押してスタート！</p></div>
+  </div>
+  <div id="scoreBox">
+    <div style="font-size:12px; color:#666; margin-bottom:5px;">タップで⭕❌を入れ替え</div>
+    <div class="score-content">
+      <div class="score-label">⭕ 正解:</div>
+      <div id="okList">-</div>
+      <div class="score-label" style="margin-top: 10px;">❌ 不正解:</div>
+      <div id="ngList">-</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================
+   【重要】ここに登録したい単語データを入力します
+   ========================================= */
+const preRegisteredWords = [
+  { word: "愛惜", reading: "あいせき", meaning: "深く悲しみ惜しむこと。" },
+{ word: "明け透け", reading: "あけすけ", meaning: "隠すことなく、包み隠しの無いこと。露骨" },
+{ word: "論う", reading: "あげつらう", meaning: "物事のよしあしについて論じ合う、欠点や失言などを言い立てる" },
+{ word: "斡旋", reading: "あっせん", meaning: "間に入って世話をすること。" },
+{ word: "軋轢", reading: "あつれき", meaning: "人の仲が悪くあい争うこと" },
+{ word: "亜流", reading: "ありゅう", meaning: "本流から派生したもので、本物には及ばないが、本物に追従するような形で存在していること。" },
+{ word: "唯唯諾諾", reading: "いいだくだく", meaning: "ただただ人の意見に盲従するさま。言いなりになること。" },
+{ word: "遺憾", reading: "いかん", meaning: "期待通りにいかず、心残りであること" },
+{ word: "意気消沈", reading: "いきしょうちん", meaning: "元気をなくし沈み込むこと。" },
+{ word: "意気投合", reading: "いきとうごう", meaning: "互いの気持ちがぴったりと合って仲良くなること。" },
+{ word: "委細", reading: "いさい", meaning: "細かく詳しいこと" },
+{ word: "已然", reading: "いぜん", meaning: "既に起こっている" },
+{ word: "一言一句", reading: "いちごんいっく", meaning: "一つひとつの言葉のこと。" },
+{ word: "一興", reading: "いっきょう", meaning: "ちょっとした楽しみ" },
+{ word: "一挙両得", reading: "いっきょりょうとく", meaning: "1つの事をして同時に2つの利益を得ること。" },
+{ word: "一心不乱", reading: "いっしんふらん", meaning: "1つのことに心を集中して他に気をとられないこと。" },
+{ word: "萎靡", reading: "いび", meaning: "気力が衰え萎れること。" },
+{ word: "いみじくも", reading: "いみじくも", meaning: "適切に、巧みにも" },
+{ word: "右往左往", reading: "うおうさおう", meaning: "うろたえてあちらへ行ったりこちらへ行ったりすること。" },
+{ word: "現", reading: "うつつ", meaning: "この世に現に存在しているもの。" },
+{ word: "右筆", reading: "うひつ", meaning: "文書を書く役目の人" },
+{ word: "営々", reading: "えいえい", meaning: "コツコツと努力するさま" },
+{ word: "英気", reading: "えいき", meaning: "すぐれた才気" },
+{ word: "詠嘆", reading: "えいたん", meaning: "深い感動を表現すること。" },
+{ word: "英断", reading: "えいだん", meaning: "優れた判断のこと" },
+{ word: "英知", reading: "えいち", meaning: "深く物事の道理に通じる才知。優れた知恵" },
+{ word: "会得", reading: "えとく", meaning: "物事の意味、本質などを理解し、自分のものにすること" },
+{ word: "沿革", reading: "えんかく", meaning: "うつりかわり" },
+{ word: "婉曲", reading: "えんきょく", meaning: "言い回しが穏やかで、角が立たないさま。" },
+{ word: "遠謀", reading: "えんぼう", meaning: "遠い先を見越した深い計略。" },
+{ word: "謳歌", reading: "おうか", meaning: "幸せな状態を大いに楽しむこと。" },
+{ word: "横柄", reading: "おうへい", meaning: "他に対して偉そうな態度をとるさま。" },
+{ word: "押し並べて", reading: "おしなべて", meaning: "全体にわたって。全て一様に" },
+{ word: "おずおず", reading: "おずおず", meaning: "おそれためらいながら行動するさま。おそるおそる" },
+{ word: "億劫", reading: "おっくう", meaning: "面倒で気が進まないこと。" },
+{ word: "徐に", reading: "おもむろに", meaning: "あわてずゆっくり" },
+{ word: "甲斐甲斐しい", reading: "かいがいしい", meaning: "動作がきびきびしていて、手ぎわがよいさま" },
+{ word: "諧謔", reading: "かいぎゃく", meaning: "ユーモア、洒落。" },
+{ word: "邂逅", reading: "かいこう", meaning: "思いがけなく会うこと。巡り会う" },
+{ word: "回視", reading: "かいし", meaning: "過去を振り返ること" },
+{ word: "懐柔", reading: "かいじゅう", meaning: "相手を巧みに操って自分の思う通りにすること" },
+{ word: "傀儡", reading: "かいらい", meaning: "影にいる人に操られ利用されている人" },
+{ word: "乖離", reading: "かいり", meaning: "かけ離れて一致しないこと。" },
+{ word: "瓦解", reading: "がかい", meaning: "組織や制度が崩れること。" },
+{ word: "果敢", reading: "かかん", meaning: "勇敢で決断力のあること。" },
+{ word: "佳境", reading: "かきょう", meaning: "興味を感じさせる場面" },
+{ word: "角逐", reading: "かくちく", meaning: "互いに競い合うこと。競り合うこと。" },
+{ word: "禍根", reading: "かこん", meaning: "将来の災いの原因。" },
+{ word: "呵責", reading: "かしゃく", meaning: "厳しく責めること" },
+{ word: "寡少", reading: "かしょう", meaning: "非常に少ないこと" },
+{ word: "割愛", reading: "かつあい", meaning: "惜しいと思うものを思いきって省略すること" },
+{ word: "闊達", reading: "かったつ", meaning: "小さなことにこだわらず伸び伸びしていること。" },
+{ word: "過分", reading: "かぶん", meaning: "身分不相応" },
+{ word: "寡聞", reading: "かぶん", meaning: "見解が狭いこと" },
+{ word: "侃侃", reading: "かんかん", meaning: "正々堂々と主張すること。" },
+{ word: "汗顔", reading: "かんがん", meaning: "恥ずかしくて顔が汗ばむこと。" },
+{ word: "諫言", reading: "かんげん", meaning: "目上の者をいさめること" },
+{ word: "甘受", reading: "かんじゅ", meaning: "仕方がないと思い受け入れること" },
+{ word: "陥穽", reading: "かんせい", meaning: "罠、策略。" },
+{ word: "奸知", reading: "かんち", meaning: "よこしまな知恵" },
+{ word: "奸智", reading: "かんち", meaning: "よこしまな知恵" },
+{ word: "看破", reading: "かんぱ", meaning: "真相を見破ること" },
+{ word: "感服", reading: "かんぷく", meaning: "敬服すること" },
+{ word: "肝要", reading: "かんよう", meaning: "非常に大切なこと" },
+{ word: "感涙", reading: "かんるい", meaning: "感動して涙を流すこと。" },
+{ word: "気鋭", reading: "きえい", meaning: "気力があり、意気込みが鋭いこと" },
+{ word: "嬉々", reading: "きき", meaning: "嬉しそうにしていること。" },
+{ word: "奇策", reading: "きさく", meaning: "人の予想もしない奇抜な手段や方法のこと。" },
+{ word: "偽作", reading: "ぎさく", meaning: "本物に似せて作ること。" },
+{ word: "帰順", reading: "きじゅん", meaning: "反逆心を改めて、服従する。" },
+{ word: "気丈", reading: "きじょう", meaning: "心や気持ちがしっかりしていること" },
+{ word: "毅然", reading: "きぜん", meaning: "意志や信念をつらぬき、物事に動じないさま" },
+{ word: "忌憚︎", reading: "きたん", meaning: "遠慮すること" },
+{ word: "機知", reading: "きち", meaning: "とっさに働く勘" },
+{ word: "拮抗", reading: "きっこう", meaning: "力が等しく互いに張り合うこと" },
+{ word: "義憤", reading: "ぎふん", meaning: "不正なことに対して怒ること" },
+{ word: "詭弁", reading: "きべん", meaning: "こじつけ" },
+{ word: "杞憂", reading: "きゆう", meaning: "心配しないでいいことを、あれこれ心配すること" },
+{ word: "窮地", reading: "きゅうち", meaning: "逃れにくい苦しい立場。" },
+{ word: "恭謙", reading: "きょうけん", meaning: "慎み深く礼儀正しいこと。" },
+{ word: "矜持", reading: "きょうじ", meaning: "自分の能力を信じること" },
+{ word: "恭順", reading: "きょうじゅん", meaning: "つつしみの態度で従うこと" },
+{ word: "怯懦", reading: "きょうだ", meaning: "臆病で気が弱いこと。" },
+{ word: "驚嘆", reading: "きょうたん", meaning: "非常に驚くこと。" },
+{ word: "暁通", reading: "ぎょうつう", meaning: "よく知っていること" },
+{ word: "曲論", reading: "きょくろん", meaning: "道理を曲げて論じること。まちがいを正しいものとする議論。" },
+{ word: "虚心坦懐", reading: "きょしんたんかい", meaning: "何のわだかまりもない素直なさっぱりした心で物事に臨むさま。" },
+{ word: "綺羅", reading: "きら", meaning: "華やかで美しいこと。" },
+{ word: "機略", reading: "きりゃく", meaning: "その時その場に応じたうまい考えや方法" },
+{ word: "器量", reading: "きりょう", meaning: "物の役に立つべき才能と徳" },
+{ word: "欣快", reading: "きんかい", meaning: "非常にうれしく気持ちがいいこと" },
+{ word: "金言", reading: "きんげん", meaning: "格言" },
+{ word: "迎合", reading: "げいごう", meaning: "自分の考えを曲げても気に入られるよう調子を合わせること" },
+{ word: "形而上", reading: "けいじじょう", meaning: "物理的でなく抽象的なもの。" },
+{ word: "閨秀", reading: "けいしゅう", meaning: "学問や芸術などに優れた女性" },
+{ word: "傾注", reading: "けいちゅう", meaning: "精神や力を一つのことに集中すること。" },
+{ word: "稀有", reading: "けう", meaning: "珍しいこと" },
+{ word: "健気", reading: "けなげ", meaning: "心がけや態度がしっかりしている様" },
+{ word: "牽強", reading: "けんきょう", meaning: "無理に理屈をこじつけること。" },
+{ word: "見識", reading: "けんしき", meaning: "すぐれた考えや意見" },
+{ word: "牽制", reading: "けんせい", meaning: "相手の行動を抑えようとすること。" },
+{ word: "言質", reading: "げんち", meaning: "証拠となる約束" },
+{ word: "校閲", reading: "こうえつ", meaning: "文書や原稿などの誤りや不備な点を調べ、検討し、訂正したり校正したりすること。" },
+{ word: "狡猾", reading: "こうかつ", meaning: "ずるく悪賢いこと" },
+{ word: "公算", reading: "こうさん", meaning: "実現する見込み" },
+{ word: "豪奢", reading: "ごうしゃ", meaning: "極めて贅沢で華やか。" },
+{ word: "巧拙", reading: "こうせつ", meaning: "上手いか下手か。" },
+{ word: "昂然", reading: "こうぜん", meaning: "威厳をもって誇らしげな様子。" },
+{ word: "拘束", reading: "こうそく", meaning: "行動の自由を制限すること。" },
+{ word: "剛胆", reading: "ごうたん", meaning: "度胸が据わっていること。" },
+{ word: "豪胆", reading: "ごうたん", meaning: "物事を恐れないこと。" },
+{ word: "拘泥", reading: "こうでい", meaning: "些細なことに執着すること。" },
+{ word: "更迭", reading: "こうてつ", meaning: "前任者がやめて新任者がその位置につくこと" },
+{ word: "荒唐無稽", reading: "こうとうむけい", meaning: "言動や考えに根拠がなく現実味のないこと。" },
+{ word: "高邁", reading: "こうまい", meaning: "理想や志が高いこと。" },
+{ word: "刻銘", reading: "こくめい", meaning: "石碑に刻まれた文字" },
+{ word: "心もとない", reading: "こころもとない", meaning: "頼りなく不安なさま" },
+{ word: "誇示", reading: "こじ", meaning: "自慢して見せること" },
+{ word: "伍する", reading: "ごする", meaning: "他者と同等の位置に並ぶ。肩を並べる" },
+{ word: "寿ぐ・言祝ぐ", reading: "ことほぐ", meaning: "言葉で祝福する。祝いの言葉を述べ幸運を祈る" },
+{ word: "孤立無援", reading: "こりつむえん", meaning: "仲間もなく助けてくれるものがいないこと。" },
+{ word: "顧慮", reading: "こりょ", meaning: "気遣うこと" },
+{ word: "昏倒", reading: "こんとう", meaning: "意識を失って倒れること。" },
+{ word: "困憊", reading: "こんぱい", meaning: "困って疲れ果てること" },
+{ word: "猜疑", reading: "さいぎ", meaning: "他人の行いをすなおに理解せずに疑うこと" },
+{ word: "再三", reading: "さいさん", meaning: "度々、何度も" },
+{ word: "債務", reading: "さいむ", meaning: "金銭を借りた者が貸し手に対してその返還をしなければならない義務のこと。" },
+{ word: "在野", reading: "ざいや", meaning: "民間の人" },
+{ word: "座視", reading: "ざし", meaning: "黙ってみているだけで関わらないようにすること" },
+{ word: "刷新", reading: "さっしん", meaning: "悪い部分を改め、全く新しくすること。" },
+{ word: "雑駁", reading: "ざっぱく", meaning: "まとまりがなく雑然としていること。" },
+{ word: "瑣末", reading: "さまつ", meaning: "些細で重要でないこと。" },
+{ word: "参画", reading: "さんかく", meaning: "計画に加わること" },
+{ word: "暫時", reading: "ざんじ", meaning: "しばらく、少しの間" },
+{ word: "蚕食", reading: "さんしょく", meaning: "次第に他の領域を侵略すること" },
+{ word: "暫定", reading: "ざんてい", meaning: "一時的な決定。" },
+{ word: "惨慄", reading: "さんりつ", meaning: "恐ろしさにぞっとすること" },
+{ word: "慈愛", reading: "じあい", meaning: "優しく愛する心。" },
+{ word: "斯界", reading: "しかい", meaning: "この社会やこの道" },
+{ word: "自画自賛", reading: "じがじさん", meaning: "自分で自分のことをほめること。" },
+{ word: "識見", reading: "しきけん", meaning: "物事を見極める優れた判断力。" },
+{ word: "至言", reading: "しげん", meaning: "いかにも正しいところを言いあてた言葉" },
+{ word: "試行錯誤", reading: "しこうさくご", meaning: "種々の方法を試み、失敗を繰り返しながら目的に向かって解決方法を追求すること。" },
+{ word: "自業自得", reading: "じごうじとく", meaning: "自分のしたことが原因で自ら受ける苦しみや災難のたとえ。" },
+{ word: "私淑", reading: "ししゅく", meaning: "密かにある人を師と考え、模範として学ぶこと" },
+{ word: "自縄自縛", reading: "じじょうじばく", meaning: "自分の言動や心がけによって、自分自身動きがとれなくなること。" },
+{ word: "七転八起", reading: "しちてんはっき", meaning: "何度失敗してもくじけず、たちあがって奮闘すること。" },
+{ word: "七転八倒", reading: "しちてんばっとう", meaning: "転がりまわって、苦しむこと。" },
+{ word: "七難八苦", reading: "しちなんはっく", meaning: "さまざまな苦難。多くの苦難が重なること。" },
+{ word: "悉皆", reading: "しっかん", meaning: "全部" },
+{ word: "桎梏", reading: "しっこく", meaning: "行動を制限する束縛や制約。" },
+{ word: "昵懇", reading: "じっこん", meaning: "親しくつきあう間柄" },
+{ word: "執拗", reading: "しつよう", meaning: "しつこく粘り強いこと。" },
+{ word: "指南", reading: "しなん", meaning: "武術・芸術などを教え示すこと。指導すること。" },
+{ word: "四面楚歌", reading: "しめんそか", meaning: "まわりが敵ばかりで孤立してしまうこと。" },
+{ word: "釈然", reading: "しゃくぜん", meaning: "疑いが晴れてすっきりする様子" },
+{ word: "酌量", reading: "しゃくりょう", meaning: "事情をくみ取って、処罰・処置などに手ごごろを加えること。" },
+{ word: "終焉", reading: "しゅうえん", meaning: "物事の終わり。" },
+{ word: "収斂", reading: "しゅうれん", meaning: "まとまり収束すること。" },
+{ word: "殊勝", reading: "しゅしょう", meaning: "とりわけすぐれているさま" },
+{ word: "出色", reading: "しゅっしょく", meaning: "他よりもきわだって優れていること" },
+{ word: "首尾一貫", reading: "しゅびいっかん", meaning: "考えや態度などが矛盾無く終始する。" },
+{ word: "巡幸", reading: "じゅんこう", meaning: "天皇が各地を見回って歩くこと。" },
+{ word: "逡巡", reading: "しゅんじゅん", meaning: "決断できず迷うこと。" },
+{ word: "憧憬", reading: "しょうけい", meaning: "強く憧れること。" },
+{ word: "瀟洒", reading: "しょうしゃ", meaning: "すっきりとオシャレな様子" },
+{ word: "憔悴", reading: "しょうすい", meaning: "疲れ果てて衰えること。" },
+{ word: "消長", reading: "しょうちょう", meaning: "勢いが盛んになったり衰退すること" },
+{ word: "譲渡", reading: "じょうと", meaning: "権利・財産、法律上の地位などを他人に譲り渡すこと。" },
+{ word: "焦眉", reading: "しょうび", meaning: "非常に差し迫った危機。" },
+{ word: "承服", reading: "しょうふく", meaning: "納得した上で従うこと" },
+{ word: "譲歩", reading: "じょうほ", meaning: "自分の意見や主張を抑えて、相手の意向に従ったり妥協したりすること。" },
+{ word: "叙勲", reading: "じょくん", meaning: "勲章を授与すること。" },
+{ word: "支離滅裂", reading: "しりめつれつ", meaning: "物事に一貫性がなく、ばらばらに乱れて筋道が立たないさま。" },
+{ word: "新鋭", reading: "しんえい", meaning: "新しく現れてきて勢いが鋭いこと" },
+{ word: "進言", reading: "しんげん", meaning: "上の者に対して意見を申し述べること" },
+{ word: "斟酌", reading: "しんしゃく", meaning: "相手の事情を考慮すること。" },
+{ word: "進取", reading: "しんしゅ", meaning: "自ら進んでことをなすこと" },
+{ word: "神出鬼没", reading: "しんしゅつきぼつ", meaning: "行動が自由自在で、所在などが容易に計り知れないこと。" },
+{ word: "進捗", reading: "しんちょく", meaning: "物事がはかどること。進み具合。" },
+{ word: "心痛", reading: "しんつう", meaning: "心配して深く思い苦しむこと。心を痛めること。" },
+{ word: "森羅万象", reading: "しんらばんしょう", meaning: "宇宙に存在する数限りない全てのもの。" },
+{ word: "随喜", reading: "ずいき", meaning: "他人の善行を喜ぶこと。" },
+{ word: "垂涎", reading: "すいぜん", meaning: "あるものを手に入れたいと熱望する" },
+{ word: "崇高", reading: "すうこう", meaning: "けだかく尊いこと" },
+{ word: "枢軸", reading: "すうじく", meaning: "物事の中心となる部分。" },
+{ word: "趨勢", reading: "すうせい", meaning: "物事がこれからどうなってゆくかというありさま" },
+{ word: "醒悟", reading: "せいご", meaning: "目が覚めて悟ること。" },
+{ word: "晴耕雨読", reading: "せいこううどく", meaning: "自適の生活を送ること。" },
+{ word: "脆弱", reading: "ぜいじゃく", meaning: "もろくて弱いこと" },
+{ word: "精緻", reading: "せいち", meaning: "細かく綿密なこと。" },
+{ word: "静謐", reading: "せいひつ", meaning: "静かで穏やかなこと。" },
+{ word: "勢力伯仲", reading: "せいりょくはくちゅう", meaning: "互いの力が接近していて優劣がつけにくいこと。" },
+{ word: "清廉潔白", reading: "せいれんけっぱく", meaning: "心や行いがきれいで後ろ暗いところのないこと。" },
+{ word: "席巻", reading: "せっけん", meaning: "広い範囲に渡り勢力を広げること" },
+{ word: "絶大", reading: "ぜつだい", meaning: "きわめて大きいこと" },
+{ word: "絶体絶命", reading: "ぜったいぜつめい", meaning: "追い詰められて逃れられない困難な立場にあること。" },
+{ word: "折衷", reading: "せっちゅう", meaning: "いいところをとって1つに合わせること" },
+{ word: "折半", reading: "せっぱん", meaning: "二等分" },
+{ word: "僭越", reading: "せんえつ", meaning: "自分の立場を越えて出過ぎたことをすること。" },
+{ word: "専横", reading: "せんおう", meaning: "わがままで横暴な振る舞い" },
+{ word: "千載一遇", reading: "せんざいいちぐう", meaning: "千年に一度しかめぐりあえないような、めったにない機会。" },
+{ word: "詮索", reading: "せんさく", meaning: "細かいことまで探り調べること。" },
+{ word: "穿鑿", reading: "せんさく", meaning: "細かいことまで探り詮索すること。" },
+{ word: "漸次", reading: "ぜんじ", meaning: "次第に" },
+{ word: "漸進", reading: "ぜんしん", meaning: "段階を追って少しずつ進んで行くこと" },
+{ word: "前代未聞", reading: "ぜんだいみもん", meaning: "これまでに一度も聞いたことがないこと。" },
+{ word: "浅薄", reading: "せんぱく", meaning: "考えが浅くて薄っぺらなこと。" },
+{ word: "造詣", reading: "ぞうけい", meaning: "ある分野に関しての知識や優れた技量" },
+{ word: "早晩", reading: "そうばん", meaning: "おそかれはやかれ、いずれいつかは" },
+{ word: "遡及", reading: "そきゅう", meaning: "過去にさかのぼって適用すること。" },
+{ word: "齟齬", reading: "そご", meaning: "物事が噛み合っていないさま" },
+{ word: "咀嚼", reading: "そしゃく", meaning: "内容をよく考えて理解すること。食べ物をよく噛んで味わうこと" },
+{ word: "措置", reading: "そち", meaning: "ある問題に対応するための処置。" },
+{ word: "ぞんざい", reading: "ぞんざい", meaning: "物事をいい加減にすること。投げやりなさま" },
+{ word: "遜色", reading: "そんしょく", meaning: "他と比べて劣っていること。見劣り" },
+{ word: "尊大", reading: "そんだい", meaning: "人を見下したような態度をとること" },
+{ word: "忖度", reading: "そんたく", meaning: "他人の気持をおしはかること" },
+{ word: "泰然", reading: "たいぜん", meaning: "落ち着いて動じないさま" },
+{ word: "泰然自若", reading: "たいぜんじじゃく", meaning: "落ち着き払っていて平常と変わらないさま。" },
+{ word: "頽廃", reading: "たいはい", meaning: "道徳や気風が衰えること。" },
+{ word: "多寡", reading: "たか", meaning: "多いことと少ないこと" },
+{ word: "逞しい", reading: "たくましい", meaning: "体や精神が強くしっかりしていること。" },
+{ word: "打診", reading: "だしん", meaning: "相手の意向を確かめるために様子を見ること" },
+{ word: "蛇足", reading: "だそく", meaning: "付け加える必要のないもの。" },
+{ word: "達観", reading: "たっかん", meaning: "物事の本質を見通すこと" },
+{ word: "揺蕩う", reading: "たゆたう", meaning: "ゆらゆらと揺れ動いて定まらない。心を決めかねる" },
+{ word: "弾劾", reading: "だんがい", meaning: "犯罪や不正をはっきりさせて、責任をとるように求めること。" },
+{ word: "端倪", reading: "たんげい", meaning: "計り知れないこと。" },
+{ word: "端正", reading: "たんせい", meaning: "姿や態度が整っていること。" },
+{ word: "胆大心小", reading: "たんだいしんしょう", meaning: "度胸は大きく、注意は細かくすべきこと。" },
+{ word: "断腸", reading: "だんちょう", meaning: "非常に悲しいこと" },
+{ word: "耽溺", reading: "たんでき", meaning: "何かに夢中になりすぎること。" },
+{ word: "単刀直入", reading: "たんとうちょくにゅう", meaning: "いきなり問題の要点に入ること。" },
+{ word: "耽読", reading: "たんどく", meaning: "夢中になって読みふけること" },
+{ word: "胆勇", reading: "たんゆう", meaning: "ものに動じない勇気があること" },
+{ word: "逐次", reading: "ちくじ", meaning: "順を追って次々に。" },
+{ word: "魑魅魍魎", reading: "ちみもうりょう", meaning: "山の怪物や川の怪物、様々な化け物。" },
+{ word: "忠心", reading: "ちゅうしん", meaning: "心の底からの思い。" },
+{ word: "中生", reading: "ちゅうせい", meaning: "早・中・晩に分けたときに中間のもの" },
+{ word: "寵愛", reading: "ちょうあい", meaning: "特別に可愛がること。" },
+{ word: "鳥瞰", reading: "ちょうかん", meaning: "全体を大きく眺め渡すこと" },
+{ word: "朝三暮四", reading: "ちょうさんぼし", meaning: "目先の違いに気をとられて、同じ結果となるのに気づかないこと。" },
+{ word: "超然", reading: "ちょうぜん", meaning: "俗事にこだわらず、平然としているさま" },
+{ word: "跳梁", reading: "ちょうりょう", meaning: "自由にはねまわること" },
+{ word: "嘲弄", reading: "ちょうろう", meaning: "馬鹿にしてからかうこと。" },
+{ word: "直言", reading: "ちょくげん", meaning: "自分の信ずる所を遠慮なく言うこと" },
+{ word: "直截", reading: "ちょくせつ", meaning: "はっきりしていて回りくどくないこと。" },
+{ word: "直観", reading: "ちょっかん", meaning: "哲学で、推理などの論理的判断によらず、対象を直接に捉えること。" },
+{ word: "沈思", reading: "ちんし", meaning: "深く考え込むこと。" },
+{ word: "逓減", reading: "ていげん", meaning: "だんだん減ること" },
+{ word: "締約", reading: "ていやく", meaning: "条約や契約を結ぶこと。" },
+{ word: "徹頭徹尾", reading: "てっとうてつび", meaning: "始めから終わりまで徹底しているさま。" },
+{ word: "天衣無縫", reading: "てんいむほう", meaning: "詩や文章などに技巧を凝らしたあとがなく、自然で完美であるさま。" },
+{ word: "電光石火", reading: "でんこうせっか", meaning: "動作などが非常に迅速なさま。" },
+{ word: "恬淡", reading: "てんたん", meaning: "名利に執着せずあっさりしていること。" },
+{ word: "伝播", reading: "でんぱ", meaning: "広く伝わること" },
+{ word: "天変地異", reading: "てんぺんちい", meaning: "台風や地震など、天地間の自然の異変。" },
+{ word: "獰悪", reading: "どうあく", meaning: "性質が乱暴で荒っぽいこと。凶悪" },
+{ word: "当意即妙", reading: "とういそくみょう", meaning: "その場にうまく適応して機転をきかすこと。" },
+{ word: "慟哭", reading: "どうこく", meaning: "声をあげて泣くこと" },
+{ word: "透徹", reading: "とうてつ", meaning: "澄んで濁りのないこと。筋道がはっきり通っていること" },
+{ word: "瞠目", reading: "どうもく", meaning: "目を見張ること。" },
+{ word: "陶冶", reading: "とうや", meaning: "才能を作り上げること" },
+{ word: "督励", reading: "とくれい", meaning: "監督して激励すること" },
+{ word: "徒食", reading: "としょく", meaning: "仕事をしないで暮らすこと" },
+{ word: "吐露", reading: "とろ", meaning: "気持・意見などを隠さずに他人にうちあけること" },
+{ word: "頓狂", reading: "とんきょう", meaning: "突然調子外れな言動をすること。" },
+{ word: "遁辞", reading: "とんじ", meaning: "言い逃れの言葉。" },
+{ word: "遁走", reading: "とんそう", meaning: "にげること" },
+{ word: "頓着", reading: "とんちゃく", meaning: "こだわって気にすること。" },
+{ word: "内憂外患", reading: "ないゆうがいかん", meaning: "国内にある心配事と国際上の心配事。" },
+{ word: "忍従", reading: "にんじゅう", meaning: "じっと我慢して服従すること" },
+{ word: "媒介", reading: "ばいかい", meaning: "何かを仲立ちすること。" },
+{ word: "背反", reading: "はいはん", meaning: "裏切ること" },
+{ word: "破顔一笑", reading: "はがんいっしょう", meaning: "顔をほころばせてにっこり笑うこと。" },
+{ word: "駁論", reading: "ばくろん", meaning: "他人の意見を論破すること。" },
+{ word: "破綻", reading: "はたん", meaning: "物事がうまくいかなくなること。" },
+{ word: "跋扈", reading: "ばっこ", meaning: "勢力を振るいはびこること。" },
+{ word: "煩瑣", reading: "はんさ", meaning: "こまごまとして面倒なこと。" },
+{ word: "盤石", reading: "ばんじゃく", meaning: "きわめて堅固なこと" },
+{ word: "反芻", reading: "はんすう", meaning: "繰り返し考え味わうこと。" },
+{ word: "晩生", reading: "ばんせい", meaning: "遅れて成長すること" },
+{ word: "反目", reading: "はんもく", meaning: "仲が悪くにらみあうこと" },
+{ word: "煩悶", reading: "はんもん", meaning: "いろいろと悩み苦しむこと。" },
+{ word: "卑近", reading: "ひきん", meaning: "ありふれていること" },
+{ word: "比肩", reading: "ひけん", meaning: "肩を並べること。同等な" },
+{ word: "誹謗", reading: "ひぼう", meaning: "悪く言って非難すること。" },
+{ word: "罷免", reading: "ひめん", meaning: "職務をやめさせること" },
+{ word: "百花繚乱", reading: "ひゃっかりょうらん", meaning: "優れた人や業績などが一時期にたくさん現れること。" },
+{ word: "謬見", reading: "びょうけん", meaning: "間違った考えや見解" },
+{ word: "剽窃", reading: "ひょうせつ", meaning: "他人の作品や考えを盗むこと。" },
+{ word: "標榜", reading: "ひょうぼう", meaning: "立て札。主義・主張などを公然に表すこと" },
+{ word: "披瀝", reading: "ひれき", meaning: "心の中の考えを包み隠さず打ち明けること" },
+{ word: "憫笑", reading: "びんしょう", meaning: "軽蔑して笑うこと。" },
+{ word: "吹聴", reading: "ふいちょう", meaning: "あちこち言いふらすこと" },
+{ word: "風靡", reading: "ふうび", meaning: "その時代に流行すること。" },
+{ word: "敷延", reading: "ふえい", meaning: "例を挙げて説明すること" },
+{ word: "符合", reading: "ふごう", meaning: "2つ以上の事柄がぴったりと合うこと" },
+{ word: "腐心", reading: "ふしん", meaning: "何かを成し遂げようと打ち込むこと" },
+{ word: "無粋", reading: "ぶすい", meaning: "野暮なこと" },
+{ word: "不為︎", reading: "ふため", meaning: "ためにならないこと" },
+{ word: "不憫", reading: "ふびん", meaning: "かわいそうで哀れむべきこと" },
+{ word: "訃報", reading: "ふほう", meaning: "人の死の知らせ。" },
+{ word: "粉飾", reading: "ふんしょく", meaning: "立派にみせかけること" },
+{ word: "辟易", reading: "へきえき", meaning: "うんざりして嫌になること。" },
+{ word: "僻地", reading: "へきち", meaning: "都市から離れた不便な場所。" },
+{ word: "偏屈", reading: "へんくつ", meaning: "かたくなで、素直でないこと。ひねくれていること。" },
+{ word: "変節", reading: "へんせつ", meaning: "それまでの主義や信念を変えること" },
+{ word: "弁駁", reading: "べんばく", meaning: "他人の言論の誤りを攻撃すること" },
+{ word: "法外", reading: "ほうがい", meaning: "普通に考えられる程度をはるかに超えていること" },
+{ word: "幇間", reading: "ほうかん", meaning: "宴会を盛り上げる人" },
+{ word: "咆哮", reading: "ほうこう", meaning: "獣が吠えるように大声で叫ぶこと。" },
+{ word: "暴虎馮河", reading: "ぼうこひょうが", meaning: "向こう見ずに命知らずのことをすること。" },
+{ word: "茫然", reading: "ぼうぜん", meaning: "驚いて呆れること。" },
+{ word: "逢着", reading: "ほうちゃく", meaning: "予期せぬ事態に出会うこと。" },
+{ word: "本末転倒", reading: "ほんまつてんとう", meaning: "根本的で重要な事柄と些細なつまらない事柄とを取り違えること。" },
+{ word: "奔流", reading: "ほんりゅう", meaning: "勢いの激しい流れ" },
+{ word: "冥利", reading: "みょうり", meaning: "幸運や恩恵に感謝すること。" },
+{ word: "無稽", reading: "むけい", meaning: "よりどころのないこと" },
+{ word: "無知蒙昧", reading: "むちもうまい", meaning: "学問がなく、物事の道理にくらいこと。" },
+{ word: "無念無想", reading: "むねんむそう", meaning: "無心。一切の妄念を離れること。" },
+{ word: "銘記", reading: "めいき", meaning: "しっかり心に刻み込み忘れないこと" },
+{ word: "明鏡止水", reading: "めいきょうしすい", meaning: "何のわだかまりもない、静かに澄みきった心の状態。" },
+{ word: "瞑想", reading: "めいそう", meaning: "深く考え込むこと。" },
+{ word: "鳴動", reading: "めいどう", meaning: "大きな音を立てること。" },
+{ word: "蒙昧", reading: "もうまい", meaning: "知識が不十分であること" },
+{ word: "朦朧", reading: "もうろう", meaning: "ぼんやりしてはっきりしないこと。" },
+{ word: "躍如", reading: "やくじょ", meaning: "生き生きと現れているさま" },
+{ word: "やにわに", reading: "やにわに", meaning: "突然、いきなり、ただちに" },
+{ word: "融通無碍", reading: "ゆうずうむげ", meaning: "一定の考え方にとらわれることなく、自由にどんな事態にも対応できること。" },
+{ word: "雄飛", reading: "ゆうひ", meaning: "勢い盛んに活動すること" },
+{ word: "夭折", reading: "ようせつ", meaning: "若くして死ぬこと。" },
+{ word: "予見", reading: "よけん", meaning: "まだ起こらないうちに先を見通すこと" },
+{ word: "落伍", reading: "らくご", meaning: "仲間から遅れてついていけなくなること" },
+{ word: "落成", reading: "らくせい", meaning: "土木建築の工事ができあがること" },
+{ word: "溜飲", reading: "りゅういん", meaning: "胃の不調による胸焼け" },
+{ word: "竜頭蛇尾", reading: "りゅうとうだび", meaning: "始めは盛んだが、終わりの振るわないこと。" },
+{ word: "領袖", reading: "りょうしゅう", meaning: "集団のかしら" },
+{ word: "理路整然", reading: "りろせいぜん", meaning: "話や考えの筋道がきちんと通っているさま。" },
+{ word: "流転", reading: "るてん", meaning: "絶えず移り変わること" },
+{ word: "流布", reading: "るふ", meaning: "世間に広まること" },
+{ word: "冷厳", reading: "れいげん", meaning: "態度や雰囲気が厳しく冷たいこと。" },
+{ word: "励行", reading: "れいこう", meaning: "努力してそうすること" },
+{ word: "麗筆", reading: "れいひつ", meaning: "美しい筆跡や文章。" },
+{ word: "憐憫", reading: "れいびん", meaning: "ふびんに思うこと" },
+{ word: "老成", reading: "ろうせい", meaning: "熟達していること" },
+{ word: "狼狽", reading: "ろうばい", meaning: "うろたえ騒ぐこと。慌てふためくさま" },
+{ word: "老練", reading: "ろうれん", meaning: "多く経験を積んで物事に慣れ、巧みであること" },
+{ word: "歪曲", reading: "わいきょく", meaning: "事実をねじ曲げること。" },
+{ word: "和洋折衷", reading: "わようせっちゅう", meaning: "日本風と西洋風をほどよく取り合わせること。" },
+
+];
+
+/* =========================================
+   全体共有データ・初期化ロジック
+   ========================================= */
+let wordData = [];
+let words = [];
+let favorites = [];
+
+// データの読み込み
+function loadData() {
+  // 元からある配列データを読み込む仕様に変更
+  wordData = preRegisteredWords;
+  words = wordData.map(w => w.word);
+  
+  // お気に入り(★)の状況だけは端末に保存しておく
+  let rawFav = JSON.parse(localStorage.getItem("favorites")) || [];
+  favorites = rawFav
+    .filter(f => typeof f === "number") // 数値データのみ許可
+    .filter(idx => idx >= 0 && idx < wordData.length); // 存在しない番号は除外
+}
+loadData(); 
+
+/* =========================================
+   タブ切り替えロジック
+   ========================================= */
+function switchTab(tabId) {
+  document.querySelectorAll('.view-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-tabs button').forEach(el => el.classList.remove('active'));
+  
+  const viewEl = document.getElementById('view-' + tabId);
+  const tabEl = document.getElementById('tab-' + tabId);
+  if(viewEl) viewEl.classList.add('active');
+  if(tabEl) tabEl.classList.add('active');
+
+  const sb = document.getElementById('scoreBox');
+
+  if (tabId === 'redsheet') {
+    if(sb) sb.style.display = 'none';
+    document.body.style.paddingTop = '170px'; document.body.style.paddingBottom = '20px';
+    initRedSheet();
+  } else if (tabId === 'test') {
+    if(sb) sb.style.display = 'flex';
+    document.body.style.paddingTop = '70px'; document.body.style.paddingBottom = '180px';
+    document.getElementById("modeSelect").onchange();
+  }
+}
+
+/* =========================================
+   クイズロジック
+   ========================================= */
+function updateAvailableCount() {
+  let list = [];
+  const mode = document.getElementById("modeSelect").value;
+  const startLoc = parseInt(document.getElementById("testStartLoc").value) || 1;
+
+  if (mode === "all") list = words.map((_, i) => i);
+  else if (mode === "fav") list = [...favorites];
+  else {
+    const s = parseInt(document.getElementById("start").value)||1, e = parseInt(document.getElementById("end").value)||words.length;
+    for (let i = s-1; i < e; i++) if (i>=0 && i<words.length) list.push(i);
+  }
+  
+  list = list.filter(idx => (idx + 1) >= startLoc);
+  
+  const countEl = document.getElementById("availableCount");
+  if(countEl) countEl.textContent = list.length;
+}
+
+let qList = [], qIdx = 0, qMode = "word", results = { "⭕": [], "❌": [] };
+document.getElementById("modeSelect").onchange = () => {
+  document.getElementById("rangeBox").style.display = (document.getElementById("modeSelect").value === "range") ? "block" : "none";
+  updateAvailableCount();
+};
+
+function startQuiz(m) {
+  qMode = m; let list = [];
+  const mode = document.getElementById("modeSelect").value;
+  const startLoc = parseInt(document.getElementById("testStartLoc").value) || 1;
+
+  if (mode === "all") list = words.map((_, i) => i);
+  else if (mode === "fav") list = [...favorites];
+  else {
+    const s = parseInt(document.getElementById("start").value)||1, e = parseInt(document.getElementById("end").value)||words.length;
+    for (let i = s-1; i < e; i++) if (i>=0 && i<words.length) list.push(i);
+  }
+  
+  list = list.filter(idx => (idx + 1) >= startLoc);
+
+  if (!list.length) return alert("対象がありません。お気に入りが空、または範囲が正しくありません。");
+  
+  const order = document.querySelector('input[name="testOrder"]:checked').value;
+  if (order === "random") {
+    qList = list.sort(() => Math.random() - 0.5).slice(0, parseInt(document.getElementById("count").value) || 10);
+  } else {
+    qList = list.slice(0, parseInt(document.getElementById("count").value) || 10);
+  }
+  
+  qIdx = 0; results = { "⭕": [], "❌": [] }; showQuiz(); updateScore();
+}
+
+function showQuiz() {
+  const box = document.getElementById("quizBox");
+  if (qIdx >= qList.length) { box.innerHTML = "<h3>終了</h3><button onclick='switchTab(\"test\")' class='quiz-btn start-word'>戻る</button>"; return; }
+  const idx = qList[qIdx], data = wordData[idx], correct = qMode === "word" ? data.meaning : data.word;
+  const questionHtml = qMode === "word" ? (data.reading ? `<ruby>${data.word}<rt>${data.reading}</rt></ruby>` : data.word) : data.meaning;
+  
+  let cs = [correct];
+  while (cs.length < Math.min(4, wordData.length)) {
+    let r = wordData[Math.floor(Math.random()*wordData.length)], f = qMode === "word" ? r.meaning : r.word;
+    if (f && !cs.includes(f)) cs.push(f);
+  }
+  cs.sort(() => Math.random() - 0.5);
+  box.innerHTML = `<div class="q-no">${qIdx+1}/${qList.length} (番号: ${idx+1})</div><div class="question">${questionHtml}</div>
+    ${cs.map(c => {
+       let displayHtml = c;
+       if (qMode === "meaning") {
+         let match = wordData.find(w => w.word === c);
+         if (match && match.reading) displayHtml = `<ruby>${match.word}<rt>${match.reading}</rt></ruby>`;
+       }
+       return `<button class="choice" data-val="${c}" data-correct="${correct}" onclick="checkQuiz(this, this.getAttribute('data-val'), this.getAttribute('data-correct'), ${idx})">${displayHtml}</button>`;
+    }).join("")}
+    <button class="giveup-btn" data-correct="${correct}" onclick="checkQuiz(null, null, this.getAttribute('data-correct'), ${idx})">わからない</button>`;
+}
+
+function checkQuiz(btn, choice, correct, idx) {
+  document.querySelectorAll(".choice").forEach(b => { 
+    b.disabled = true; 
+    if (b.getAttribute("data-val") === correct) b.classList.add("correct"); 
+  });
+  if (btn && choice !== correct) btn.classList.add("wrong");
+  recordScore(choice === correct ? "⭕" : "❌", idx + 1);
+  setTimeout(() => { qIdx++; showQuiz(); }, 1000);
+}
+
+function recordScore(m, n) {
+  results["⭕"] = results["⭕"].filter(x => x !== n); results["❌"] = results["❌"].filter(x => x !== n);
+  results[m].push(n); results["⭕"].sort((a,b)=>a-b); results["❌"].sort((a,b)=>a-b); updateScore();
+}
+
+function updateScore() {
+  const f = (m) => results[m].length ? results[m].map(n => {
+    let w = wordData[n-1];
+    let rubyHtml = w.reading ? `<ruby>${w.word}<rt>${w.reading}</rt></ruby>` : w.word;
+    return `<span class="mark-span ${m==='⭕'?'correctMark':'wrongMark'}" onclick="toggleScore(${n})">${n}:${rubyHtml}</span>`;
+  }).join(",") : "-";
+  document.getElementById("okList").innerHTML = f("⭕"); document.getElementById("ngList").innerHTML = f("❌");
+}
+function toggleScore(n) { results["⭕"].includes(n) ? recordScore("❌", n) : recordScore("⭕", n); }
+
+/* =========================================
+   赤シートロジック
+   ========================================= */
+let redActiveList = [];
+let redCurrentStep = 0;
+
+function initRedSheet() {
+  const mode = document.getElementById("redModeSelect").value;
+  const startNum = parseInt(document.getElementById("redStartNum").value) || 1;
+  const side = document.querySelector('input[name="hideSide"]:checked').value;
+  const sortType = document.getElementById("redSortSelect").value;
+  
+  let baseList = (mode === "fav") ? [...favorites] : words.map((_, i) => i);
+  redActiveList = baseList.filter(idx => (idx + 1) >= startNum);
+
+  // ランダム機能の追加
+  if (sortType === "random") {
+    for (let i = redActiveList.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [redActiveList[i], redActiveList[j]] = [redActiveList[j], redActiveList[i]];
+    }
+  }
+  
+  const body = document.getElementById("red-list-body");
+  body.innerHTML = "";
+  
+  redActiveList.forEach((idx) => {
+    const data = wordData[idx];
+    if (!data) return;
+
+    const row = document.createElement("div");
+    row.className = "red-row";
+    
+    const wordClass = (side === "word") ? "hide-target" : "";
+    const meaningClass = (side === "meaning") ? "hide-target" : "";
+    const wordHtml = data.reading ? `<ruby>${data.word}<rt>${data.reading}</rt></ruby>` : data.word;
+
+    row.innerHTML = `
+      <div class="red-star-col ${favorites.includes(idx) ? 'fav' : ''}" onclick="toggleRedFavorite(${idx}, this)">★</div>
+      <div class="red-word-col ${wordClass}">${wordHtml}</div>
+      <div class="red-meaning-col ${meaningClass}">${data.meaning || "---"}</div>
+    `;
+    body.appendChild(row);
+  });
+
+  const sheet = document.getElementById("moving-sheet");
+  sheet.style.left = (side === "word") ? "50px" : "calc(50% + 15px)";
+  
+  document.getElementById("red-counter").textContent = `0 / ${redActiveList.length}`;
+  resetRedSheet();
+}
+
+function toggleRedFavorite(idx, el) {
+  if (favorites.includes(idx)) {
+    favorites = favorites.filter(n => n !== idx);
+    el.classList.remove('fav');
+  } else {
+    favorites.push(idx);
+    favorites.sort((a, b) => a - b);
+    el.classList.add('fav');
+  }
+  localStorage.setItem("favorites", JSON.stringify(favorites));
+}
+
+function resetRedSheet() {
+  redCurrentStep = 0;
+  const sheet = document.getElementById("moving-sheet");
+  sheet.style.top = "0px";
+  
+  const body = document.getElementById("red-list-body");
+  const rows = body.getElementsByClassName("red-row");
+  let totalHeight = 0;
+  for (let i = 0; i < rows.length; i++) {
+     if(rows[i]) totalHeight += rows[i].offsetHeight;
+  }
+  sheet.style.height = (rows.length > 0 ? Math.max(100, totalHeight) + "px" : "100%");
+  
+  updateRedCounter();
+}
+
+function nextRedStep() {
+  if (redActiveList.length === 0) return;
+  if (redCurrentStep >= redActiveList.length) {
+    if(confirm("最後まで到達しました。リセットしますか？")) resetRedSheet();
+    return;
+  }
+  
+  const body = document.getElementById("red-list-body");
+  const rows = body.getElementsByClassName("red-row");
+  
+  redCurrentStep++;
+  
+  let newTop = 0;
+  for (let i = 0; i < redCurrentStep; i++) {
+     if(rows[i]) newTop += rows[i].offsetHeight;
+  }
+  
+  let totalHeight = 0;
+  for (let i = 0; i < rows.length; i++) {
+     if(rows[i]) totalHeight += rows[i].offsetHeight;
+  }
+
+  const sheet = document.getElementById("moving-sheet");
+  sheet.style.top = newTop + "px";
+  sheet.style.height = Math.max(100, totalHeight - newTop) + "px";
+
+  updateRedCounter();
+  if (newTop > window.innerHeight / 2) window.scrollTo({ top: newTop - 100, behavior: 'smooth' });
+}
+
+function updateRedCounter() {
+  document.getElementById("red-counter").textContent = `${redCurrentStep} / ${redActiveList.length}`;
+}
+
+window.addEventListener('keydown', (e) => {
+  const redSheetView = document.getElementById('view-redsheet');
+  if (redSheetView && redSheetView.classList.contains('active')) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault(); 
+      nextRedStep();
+    }
+  }
+});
+
+window.onload = () => { switchTab('redsheet'); };
+</script>
+
+</body>
+</html>
